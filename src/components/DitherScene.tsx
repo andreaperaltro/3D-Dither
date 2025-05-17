@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Instances, Instance } from '@react-three/drei';
 import * as THREE from 'three';
@@ -25,24 +25,15 @@ interface DitherSceneProps {
   controls: DitherControls;
 }
 
-interface PointData {
-  position: THREE.Vector3;
-  color: THREE.Color;
-  size: number;
-}
-
-const DitherShapes: React.FC<{ 
-  imageData?: ImageData;
-  controls: DitherControls;
-}> = ({ imageData, controls }) => {
-  const groupRef = useRef<THREE.Group>(null);
-  const [pointsData, setPointsData] = useState<PointData[]>([]);
+const DitherShapes = ({ imageData, controls }) => {
+  const groupRef = useRef(null);
+  const [pointsData, setPointsData] = useState([]);
 
   useEffect(() => {
     if (!imageData) return;
 
     const { width, height, data } = imageData;
-    const newPointsData: PointData[] = [];
+    const newPointsData = [];
 
     // Calculate the maximum dimension for proper scaling
     const maxDimension = Math.max(width, height);
@@ -142,8 +133,8 @@ const DitherShapes: React.FC<{
           <primitive object={geometry} />
           <pointsMaterial
             size={1}
-            vertexColors={true}
-            sizeAttenuation={true}
+            vertexColors
+            sizeAttenuation
             transparent
             opacity={controls.pointOpacity}
           />
@@ -159,7 +150,7 @@ const DitherShapes: React.FC<{
           {pointsData.map((point, i) => (
             <Instance 
               key={i} 
-              position={point.position} 
+              position={[point.position.x, point.position.y, point.position.z]} 
               color={point.color} 
               scale={point.size} 
             />
@@ -176,7 +167,7 @@ const DitherShapes: React.FC<{
           {pointsData.map((point, i) => (
             <Instance 
               key={i} 
-              position={point.position} 
+              position={[point.position.x, point.position.y, point.position.z]} 
               color={point.color} 
               scale={point.size} 
             />
