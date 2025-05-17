@@ -1,43 +1,6 @@
 import React, { useState } from 'react';
 
-interface DitherControls {
-  gridSize: number;
-  minDotSize: number;
-  maxDotSize: number;
-  brightness: number;
-  contrast: number;
-  depthIntensity: number;
-  depthOffset: number;
-  depthScale: number;
-  pointOpacity: number;
-  threshold: number;
-  rotationSpeed: number;
-  pointColor: string;
-  colorSampling: boolean;
-  contourLevels: number;
-  // Stroke width for grid and topographic
-  strokeWidth: number;
-  // Topographic colors
-  topoColorLow: string; 
-  topoColorHigh: string;
-  // Shape rotation controls
-  shapeRotationX: number;
-  shapeRotationY: number;
-  shapeRotationZ: number;
-  // Shape-specific parameters
-  torusOuterRadius: number;
-  torusInnerRadius: number;
-  coneRadius: number;
-  coneHeight: number;
-  cubeWidth: number;
-  cubeHeight: number;
-  cubeDepth: number;
-  sphereRadius: number;
-  sphereDetail: number;
-  triangleRadius: number;
-  triangleHeight: number;
-  shapeType: 'point' | 'cube' | 'sphere' | 'grid' | 'line' | 'triangle' | 'torus' | 'cone' | 'topographic';
-}
+// Using the DitherControls interface from types.d.ts
 
 interface DitherControlsProps {
   controls: DitherControls;

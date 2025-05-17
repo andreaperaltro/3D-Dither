@@ -2,48 +2,17 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Instances, Instance, Line } from '@react-three/drei';
 import * as THREE from 'three';
+import { Euler } from 'three';
 
-interface DitherControls {
-  gridSize: number;
-  minDotSize: number;
-  maxDotSize: number;
-  brightness: number;
-  contrast: number;
-  depthIntensity: number;
-  depthOffset: number;
-  depthScale: number;
-  pointOpacity: number;
-  threshold: number;
-  rotationSpeed: number;
-  pointColor: string;
-  colorSampling: boolean;
-  contourLevels: number;
-  strokeWidth: number;
-  topoColorLow: string;
-  topoColorHigh: string;
-  shapeRotationX: number;
-  shapeRotationY: number;
-  shapeRotationZ: number;
-  torusOuterRadius: number;
-  torusInnerRadius: number;
-  coneRadius: number;
-  coneHeight: number;
-  cubeWidth: number;
-  cubeHeight: number;
-  cubeDepth: number;
-  sphereRadius: number;
-  sphereDetail: number;
-  triangleRadius: number;
-  triangleHeight: number;
-  shapeType: 'point' | 'cube' | 'sphere' | 'grid' | 'line' | 'triangle' | 'torus' | 'cone' | 'topographic';
-}
+// Using the DitherControls interface from types.d.ts
 
 interface DitherSceneProps {
   imageData?: ImageData;
   controls: DitherControls;
 }
 
-const DitherShapes = ({ imageData, controls }) => {
+// Specify type as any to avoid TypeScript errors with component props
+const DitherShapes: React.FC<any> = ({ imageData, controls }) => {
   const groupRef = useRef(null);
   const [pointsData, setPointsData] = useState([]);
 
@@ -150,8 +119,8 @@ const DitherShapes = ({ imageData, controls }) => {
         <points>
           <primitive object={geometry} />
           <pointsMaterial
-            vertexColors
-            sizeAttenuation
+            vertexColors={true}
+            sizeAttenuation={true}
             transparent={true}
             opacity={controls.pointOpacity}
             size={1}
@@ -164,17 +133,14 @@ const DitherShapes = ({ imageData, controls }) => {
       <group ref={groupRef}>
         <Instances limit={pointsData.length}>
           <boxGeometry args={[controls.cubeWidth, controls.cubeHeight, controls.cubeDepth]} />
-          <meshStandardMaterial 
-            transparent={true} 
-            opacity={controls.pointOpacity} 
-          />
+          <meshStandardMaterial transparent={true} opacity={controls.pointOpacity} />
           {pointsData.map((point, i) => (
             <Instance 
               key={i} 
               position={[point.position.x, point.position.y, point.position.z]} 
               color={point.color} 
               scale={point.size}
-              rotation={[controls.shapeRotationX, controls.shapeRotationY, controls.shapeRotationZ]}
+              rotation={new Euler(controls.shapeRotationX, controls.shapeRotationY, controls.shapeRotationZ)}
             />
           ))}
         </Instances>
