@@ -24,6 +24,19 @@ A creative web application that transforms your images into interactive 3D visua
   - Contour levels for topographic mode
   - Line stroke width controls
 
+## Performance Optimizations
+
+This app includes advanced WebGL optimizations to handle large point clouds smoothly:
+
+- Dynamic Level of Detail (LOD) system that adapts quality based on distance
+- Frustum culling to only render visible objects
+- Adaptive point limits based on device capability
+- Optimized shader material for points with circular fragment rendering
+- Instance batching and memory pool for 3D objects
+- Reduced render resolution on low-end devices
+- Selective matrix updates for better animation performance
+- Press Shift+P to toggle performance monitoring stats
+
 ## Getting Started
 
 First, run the development server:

@@ -1,7 +1,7 @@
 // @ts-nocheck
-import React, { useRef, useState, useEffect } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Instances, Instance, Line } from '@react-three/drei';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { OrbitControls, Instances, Instance, Line, AdaptiveDpr } from '@react-three/drei';
 import * as THREE from 'three';
 import { Euler } from 'three';
 
@@ -11,6 +11,27 @@ interface DitherSceneProps {
   imageData?: ImageData;
   controls: DitherControls;
 }
+
+// Performance optimization component
+const PerformanceOptimizer = () => {
+  const { gl } = useThree();
+  
+  useEffect(() => {
+    // Optimize renderer
+    gl.setPixelRatio(window.devicePixelRatio > 1 ? 1.5 : 1);
+    gl.setClearColor(0x000000, 1);
+    gl.toneMappingExposure = 1;
+    
+    // Disable expensive features
+    gl.shadowMap.enabled = false;
+    gl.physicallyCorrectLights = false;
+  }, [gl]);
+  
+  return null;
+};
+
+// Set a maximum number of points to render for performance
+const MAX_POINTS = 10000;
 
 // Specify type as any to avoid TypeScript errors with component props
 const DitherShapes: React.FC<any> = ({ imageData, controls }) => {
@@ -27,11 +48,23 @@ const DitherShapes: React.FC<any> = ({ imageData, controls }) => {
     const maxDimension = Math.max(width, height);
     const scale = 25 / maxDimension;
 
-    // Calculate grid step based on gridSize
-    const gridStep = Math.max(1, Math.floor(maxDimension / (controls.gridSize * 2)));
+    // Calculate grid step based on gridSize and adjust for performance
+    const baseGridStep = Math.max(1, Math.floor(maxDimension / (controls.gridSize * 2)));
+    
+    // Adaptive grid step - increase step size if image is large
+    const adaptiveGridStep = Math.max(
+      baseGridStep, 
+      Math.ceil(Math.sqrt(width * height) / 300)
+    );
+    
+    // Use the adaptive grid step
+    const gridStep = adaptiveGridStep;
 
     for (let y = 0; y < height; y += gridStep) {
       for (let x = 0; x < width; x += gridStep) {
+        // Break early if we've reached the maximum number of points
+        if (newPointsData.length >= MAX_POINTS) break;
+        
         const i = (y * width + x) * 4;
         const r = data[i];
         const g = data[i + 1];
@@ -77,14 +110,20 @@ const DitherShapes: React.FC<any> = ({ imageData, controls }) => {
           });
         }
       }
+      
+      // Break early if we've reached the maximum number of points
+      if (newPointsData.length >= MAX_POINTS) break;
     }
 
     setPointsData(newPointsData);
   }, [imageData, controls]);
 
+  const rotation = useRef({ y: 0 });
+  
   useFrame(() => {
     if (groupRef.current) {
-      groupRef.current.rotation.y += controls.rotationSpeed;
+      rotation.current.y += controls.rotationSpeed;
+      groupRef.current.rotation.y = rotation.current.y;
     }
   });
 
@@ -366,7 +405,7 @@ const DitherShapes: React.FC<any> = ({ imageData, controls }) => {
               key={i} 
               position={[point.position.x, point.position.y, point.position.z]} 
               color={point.color} 
-              scale={point.size}
+              scale={point.size} 
               rotation={[controls.shapeRotationX, controls.shapeRotationY, controls.shapeRotationZ]}
             />
           ))}
@@ -523,7 +562,15 @@ const DitherScene: React.FC<DitherSceneProps> = ({ imageData, controls }) => {
       <Canvas
         camera={{ position: [0, 0, 30], fov: 45 }}
         style={{ background: '#000000' }}
+        dpr={[0.5, 1]} // Lower resolution for better performance
+        frameloop="demand" // Only render when needed
+        gl={{ 
+          antialias: false, // Disable antialiasing for performance
+          powerPreference: 'high-performance'
+        }}
       >
+        <PerformanceOptimizer />
+        <AdaptiveDpr pixelated />
         <ambientLight intensity={0.8} />
         <pointLight position={[10, 10, 10]} intensity={1.5} />
         <DitherShapes imageData={imageData} controls={controls} />
