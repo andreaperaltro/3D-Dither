@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Instances, Instance } from '@react-three/drei';
+import { OrbitControls, Instances, Instance, Line } from '@react-three/drei';
 import * as THREE from 'three';
 
 interface DitherControls {
@@ -17,7 +17,25 @@ interface DitherControls {
   rotationSpeed: number;
   pointColor: string;
   colorSampling: boolean;
-  shapeType: 'point' | 'cube' | 'sphere';
+  contourLevels: number;
+  strokeWidth: number;
+  topoColorLow: string;
+  topoColorHigh: string;
+  shapeRotationX: number;
+  shapeRotationY: number;
+  shapeRotationZ: number;
+  torusOuterRadius: number;
+  torusInnerRadius: number;
+  coneRadius: number;
+  coneHeight: number;
+  cubeWidth: number;
+  cubeHeight: number;
+  cubeDepth: number;
+  sphereRadius: number;
+  sphereDetail: number;
+  triangleRadius: number;
+  triangleHeight: number;
+  shapeType: 'point' | 'cube' | 'sphere' | 'grid' | 'line' | 'triangle' | 'torus' | 'cone' | 'topographic';
 }
 
 interface DitherSceneProps {
@@ -132,11 +150,11 @@ const DitherShapes = ({ imageData, controls }) => {
         <points>
           <primitive object={geometry} />
           <pointsMaterial
-            size={1}
             vertexColors
             sizeAttenuation
-            transparent
+            transparent={true}
             opacity={controls.pointOpacity}
+            size={1}
           />
         </points>
       </group>
@@ -145,14 +163,18 @@ const DitherShapes = ({ imageData, controls }) => {
     return (
       <group ref={groupRef}>
         <Instances limit={pointsData.length}>
-          <boxGeometry args={[1, 1, 1]} />
-          <meshStandardMaterial transparent opacity={controls.pointOpacity} />
+          <boxGeometry args={[controls.cubeWidth, controls.cubeHeight, controls.cubeDepth]} />
+          <meshStandardMaterial 
+            transparent={true} 
+            opacity={controls.pointOpacity} 
+          />
           {pointsData.map((point, i) => (
             <Instance 
               key={i} 
               position={[point.position.x, point.position.y, point.position.z]} 
               color={point.color} 
-              scale={point.size} 
+              scale={point.size}
+              rotation={[controls.shapeRotationX, controls.shapeRotationY, controls.shapeRotationZ]}
             />
           ))}
         </Instances>
@@ -162,17 +184,365 @@ const DitherShapes = ({ imageData, controls }) => {
     return (
       <group ref={groupRef}>
         <Instances limit={pointsData.length}>
-          <sphereGeometry args={[0.5, 8, 8]} />
-          <meshStandardMaterial transparent opacity={controls.pointOpacity} />
+          <sphereGeometry args={[controls.sphereRadius, controls.sphereDetail, controls.sphereDetail]} />
+          <meshStandardMaterial 
+            transparent={true} 
+            opacity={controls.pointOpacity} 
+          />
           {pointsData.map((point, i) => (
             <Instance 
               key={i} 
               position={[point.position.x, point.position.y, point.position.z]} 
               color={point.color} 
-              scale={point.size} 
+              scale={point.size}
+              rotation={[controls.shapeRotationX, controls.shapeRotationY, controls.shapeRotationZ]}
             />
           ))}
         </Instances>
+      </group>
+    );
+  } else if (controls.shapeType === 'grid') {
+    // Create a wireframe grid where points are connected with lines
+    // First we need to organize points into a 2D grid structure
+    const { width, height } = imageData;
+    const maxDimension = Math.max(width, height);
+    const scale = 25 / maxDimension;
+    
+    // Calculate number of cells in each dimension
+    const gridStep = Math.max(1, Math.floor(maxDimension / (controls.gridSize * 2)));
+    const gridWidth = Math.ceil(width / gridStep);
+    const gridHeight = Math.ceil(height / gridStep);
+    
+    // Create vertices array mapping 2D positions to 3D space
+    const vertices = [];
+    const gridPoints = Array(gridHeight).fill(null).map(() => Array(gridWidth).fill(null));
+    
+    // First pass: create all vertices and store them in a 2D array
+    for (let y = 0; y < height; y += gridStep) {
+      const gridY = Math.floor(y / gridStep);
+      if (gridY >= gridHeight) continue;
+      
+      for (let x = 0; x < width; x += gridStep) {
+        const gridX = Math.floor(x / gridStep);
+        if (gridX >= gridWidth) continue;
+        
+        const i = (y * width + x) * 4;
+        const r = imageData.data[i];
+        const g = imageData.data[i + 1];
+        const b = imageData.data[i + 2];
+        
+        // Calculate brightness with adjustments
+        let brightness = (r + g + b) / 3;
+        brightness = (brightness / 255 - 0.5) * controls.contrast + 0.5;
+        brightness = Math.max(0, Math.min(1, brightness * controls.brightness));
+        
+        // Calculate depth from brightness
+        const depth = (1 - brightness) * controls.depthScale + controls.depthOffset;
+        const depthZ = depth * controls.depthIntensity;
+        
+        // Store position and depth
+        const posX = (x - width / 2) * scale;
+        const posY = -(y - height / 2) * scale;
+        
+        // Store vertex position in our grid array
+        gridPoints[gridY][gridX] = {
+          position: [posX, posY, depthZ],
+          brightness
+        };
+      }
+    }
+    
+    // Create a collection of line segments
+    const allLines = [];
+    const colors = [];
+    
+    // Connect horizontal lines
+    for (let y = 0; y < gridHeight; y++) {
+      for (let x = 0; x < gridWidth - 1; x++) {
+        const point1 = gridPoints[y][x];
+        const point2 = gridPoints[y][x + 1];
+        
+        if (point1 && point2) {
+          // Add line segment
+          allLines.push({
+            points: [
+              new THREE.Vector3(...point1.position),
+              new THREE.Vector3(...point2.position)
+            ],
+            color: controls.colorSampling ? 
+              new THREE.Color(
+                0.7 + point1.brightness * 0.3, 
+                0.7 + point1.brightness * 0.3, 
+                0.7 + point1.brightness * 0.3
+              ) : 
+              new THREE.Color(controls.pointColor)
+          });
+        }
+      }
+    }
+    
+    // Connect vertical lines
+    for (let x = 0; x < gridWidth; x++) {
+      for (let y = 0; y < gridHeight - 1; y++) {
+        const point1 = gridPoints[y][x];
+        const point2 = gridPoints[y + 1][x];
+        
+        if (point1 && point2) {
+          // Add line segment
+          allLines.push({
+            points: [
+              new THREE.Vector3(...point1.position),
+              new THREE.Vector3(...point2.position)
+            ],
+            color: controls.colorSampling ? 
+              new THREE.Color(
+                0.7 + point1.brightness * 0.3, 
+                0.7 + point1.brightness * 0.3, 
+                0.7 + point1.brightness * 0.3
+              ) : 
+              new THREE.Color(controls.pointColor)
+          });
+        }
+      }
+    }
+    
+    return (
+      <group ref={groupRef}>
+        {allLines.map((line, index) => (
+          <Line
+            key={index}
+            points={line.points}
+            color={line.color}
+            lineWidth={controls.strokeWidth}
+            opacity={controls.pointOpacity}
+            transparent={true}
+          />
+        ))}
+      </group>
+    );
+  } else if (controls.shapeType === 'line') {
+    // Line effect - vertical lines with varying height based on brightness
+    return (
+      <group ref={groupRef}>
+        {pointsData.map((point, i) => (
+          <mesh 
+            key={i} 
+            position={[point.position.x, point.position.y - point.size/4, point.position.z]}
+          >
+            <boxGeometry args={[0.2, point.size, 0.2]} />
+            <meshStandardMaterial 
+              color={point.color} 
+              transparent={true} 
+              opacity={controls.pointOpacity} 
+            />
+          </mesh>
+        ))}
+      </group>
+    );
+  } else if (controls.shapeType === 'triangle') {
+    return (
+      <group ref={groupRef}>
+        <Instances limit={pointsData.length}>
+          <coneGeometry args={[controls.triangleRadius, controls.triangleHeight, 3]} />
+          <meshStandardMaterial 
+            transparent={true} 
+            opacity={controls.pointOpacity} 
+          />
+          {pointsData.map((point, i) => (
+            <Instance 
+              key={i} 
+              position={[point.position.x, point.position.y, point.position.z]} 
+              color={point.color} 
+              scale={point.size}
+              rotation={[
+                Math.PI/2 + controls.shapeRotationX, 
+                controls.shapeRotationY, 
+                controls.shapeRotationZ
+              ]}
+            />
+          ))}
+        </Instances>
+      </group>
+    );
+  } else if (controls.shapeType === 'torus') {
+    return (
+      <group ref={groupRef}>
+        <Instances limit={pointsData.length}>
+          <torusGeometry args={[controls.torusOuterRadius, controls.torusInnerRadius, 8, 16]} />
+          <meshStandardMaterial 
+            transparent={true} 
+            opacity={controls.pointOpacity} 
+          />
+          {pointsData.map((point, i) => (
+            <Instance 
+              key={i} 
+              position={[point.position.x, point.position.y, point.position.z]} 
+              color={point.color} 
+              scale={point.size}
+              rotation={[controls.shapeRotationX, controls.shapeRotationY, controls.shapeRotationZ]}
+            />
+          ))}
+        </Instances>
+      </group>
+    );
+  } else if (controls.shapeType === 'cone') {
+    return (
+      <group ref={groupRef}>
+        <Instances limit={pointsData.length}>
+          <coneGeometry args={[controls.coneRadius, controls.coneHeight, 16]} />
+          <meshStandardMaterial 
+            transparent={true} 
+            opacity={controls.pointOpacity} 
+          />
+          {pointsData.map((point, i) => (
+            <Instance 
+              key={i} 
+              position={[point.position.x, point.position.y, point.position.z]} 
+              color={point.color} 
+              scale={point.size}
+              rotation={[controls.shapeRotationX, controls.shapeRotationY, controls.shapeRotationZ]}
+            />
+          ))}
+        </Instances>
+      </group>
+    );
+  } else if (controls.shapeType === 'topographic') {
+    // Create a topographic map effect with contour lines
+    const { width, height } = imageData;
+    const maxDimension = Math.max(width, height);
+    const scale = 25 / maxDimension;
+    
+    // Calculate grid step based on gridSize
+    const gridStep = Math.max(1, Math.floor(maxDimension / (controls.gridSize * 2)));
+    const gridWidth = Math.ceil(width / gridStep);
+    const gridHeight = Math.ceil(height / gridStep);
+    
+    // Create a 2D grid of depth values
+    const depthGrid = Array(gridHeight).fill(null).map(() => Array(gridWidth).fill(null));
+    const positionGrid = Array(gridHeight).fill(null).map(() => Array(gridWidth).fill(null));
+    
+    // First pass: create all vertices and store depths in a 2D array
+    for (let y = 0; y < height; y += gridStep) {
+      const gridY = Math.floor(y / gridStep);
+      if (gridY >= gridHeight) continue;
+      
+      for (let x = 0; x < width; x += gridStep) {
+        const gridX = Math.floor(x / gridStep);
+        if (gridX >= gridWidth) continue;
+        
+        const i = (y * width + x) * 4;
+        const r = imageData.data[i];
+        const g = imageData.data[i + 1];
+        const b = imageData.data[i + 2];
+        
+        // Calculate brightness with adjustments
+        let brightness = (r + g + b) / 3;
+        brightness = (brightness / 255 - 0.5) * controls.contrast + 0.5;
+        brightness = Math.max(0, Math.min(1, brightness * controls.brightness));
+        
+        // Calculate depth from brightness
+        const depth = (1 - brightness) * controls.depthScale + controls.depthOffset;
+        const depthZ = depth * controls.depthIntensity;
+        
+        // Store position and depth
+        const posX = (x - width / 2) * scale;
+        const posY = -(y - height / 2) * scale;
+        
+        depthGrid[gridY][gridX] = depthZ;
+        positionGrid[gridY][gridX] = [posX, posY, depthZ];
+      }
+    }
+    
+    // Create contour lines at fixed intervals
+    const minDepth = Math.min(...depthGrid.flat().filter(v => v !== null));
+    const maxDepth = Math.max(...depthGrid.flat().filter(v => v !== null));
+    const depthRange = maxDepth - minDepth;
+    
+    // Number of contour levels - now controlled by user
+    const numContours = controls.contourLevels;
+    const contourInterval = depthRange / numContours;
+    
+    // Convert hex colors to Three.js colors
+    const lowColor = new THREE.Color(controls.topoColorLow);
+    const highColor = new THREE.Color(controls.topoColorHigh);
+    
+    // Collection of contour lines to render
+    const contourLines = [];
+    
+    // For each contour level, create lines representing that depth
+    for (let level = 0; level < numContours; level++) {
+      const contourDepth = minDepth + level * contourInterval;
+      
+      // Calculate a color for this contour level based on custom colors
+      const t = level / numContours; // Normalized level (0 to 1)
+      const color = new THREE.Color().lerpColors(lowColor, highColor, t);
+      
+      // Process grid cells to find contour crossings
+      for (let y = 0; y < gridHeight - 1; y++) {
+        for (let x = 0; x < gridWidth - 1; x++) {
+          // Get the four corners of this grid cell
+          const corners = [
+            { pos: positionGrid[y][x], depth: depthGrid[y][x] },
+            { pos: positionGrid[y][x + 1], depth: depthGrid[y][x + 1] },
+            { pos: positionGrid[y + 1][x + 1], depth: depthGrid[y + 1][x + 1] },
+            { pos: positionGrid[y + 1][x], depth: depthGrid[y + 1][x] }
+          ];
+          
+          // Skip if any corner is missing
+          if (corners.some(c => !c.pos || c.depth === null)) continue;
+          
+          // Check each edge of the cell for contour crossings
+          const edges = [
+            [0, 1], [1, 2], [2, 3], [3, 0]
+          ];
+          
+          const intersections = [];
+          for (const [i, j] of edges) {
+            const depthA = corners[i].depth;
+            const depthB = corners[j].depth;
+            
+            // If contour crosses this edge
+            if ((depthA <= contourDepth && depthB >= contourDepth) || 
+                (depthA >= contourDepth && depthB <= contourDepth)) {
+              
+              // Calculate interpolation factor
+              const t = Math.abs((contourDepth - depthA) / (depthB - depthA)) || 0;
+              
+              // Linearly interpolate position
+              const posA = corners[i].pos;
+              const posB = corners[j].pos;
+              
+              const interpX = posA[0] + t * (posB[0] - posA[0]);
+              const interpY = posA[1] + t * (posB[1] - posA[1]);
+              
+              // Store the intersection point
+              intersections.push(new THREE.Vector3(interpX, interpY, contourDepth));
+            }
+          }
+          
+          // If we found exactly 2 intersections, we can draw a line
+          if (intersections.length === 2) {
+            contourLines.push({
+              points: [intersections[0], intersections[1]],
+              color: color
+            });
+          }
+        }
+      }
+    }
+    
+    return (
+      <group ref={groupRef}>
+        {contourLines.map((line, index) => (
+          <Line
+            key={index}
+            points={line.points}
+            color={line.color}
+            lineWidth={controls.strokeWidth}
+            opacity={controls.pointOpacity}
+            transparent={true}
+          />
+        ))}
       </group>
     );
   }
@@ -205,4 +575,4 @@ const DitherScene: React.FC<DitherSceneProps> = ({ imageData, controls }) => {
   );
 };
 
-export default DitherScene; 
+export default DitherScene;
