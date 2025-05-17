@@ -1,4 +1,28 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 3D Dither
+
+A creative web application that transforms your images into interactive 3D visualizations using a dithering effect. Built with Next.js, Three.js, and React Three Fiber.
+
+## Features
+
+- Upload any image and see it transformed into a 3D point cloud
+- Choose from multiple shape types:
+  - Points (classic dither effect)
+  - Cubes, Spheres, Triangles
+  - Rings (torus)
+  - Cones
+  - Grid (wireframe)
+  - Lines
+  - Topographic contour lines
+- Extensive controls for customization:
+  - Grid density
+  - Size and opacity
+  - Brightness and contrast
+  - Depth mapping
+  - Color sampling or solid colors
+  - 3D rotation controls
+  - Shape-specific parameters
+  - Contour levels for topographic mode
+  - Line stroke width controls
 
 ## Getting Started
 
@@ -16,9 +40,27 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## How It Works
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The application processes your uploaded image pixel by pixel, extracting brightness values to determine:
+1. Which points to render (based on threshold)
+2. How large each point should be (based on brightness)
+3. The depth (z-position) of each point (creating a 3D effect)
+4. The color of each point (either sampled from the original image or a solid color)
+
+The 3D scene can be manipulated with mouse controls:
+- Left-click and drag to rotate
+- Right-click and drag to pan
+- Scroll to zoom
+
+## Technologies Used
+
+- [Next.js](https://nextjs.org/) - React framework
+- [Three.js](https://threejs.org/) - 3D library
+- [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) - React renderer for Three.js
+- [@react-three/drei](https://github.com/pmndrs/drei) - Useful helpers for React Three Fiber
+- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
+- [TypeScript](https://www.typescriptlang.org/) - Type safety
 
 ## Learn More
 

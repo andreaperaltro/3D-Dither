@@ -14,7 +14,29 @@ interface DitherControls {
   rotationSpeed: number;
   pointColor: string;
   colorSampling: boolean;
-  shapeType: 'point' | 'cube' | 'sphere';
+  contourLevels: number;
+  // Stroke width for grid and topographic
+  strokeWidth: number;
+  // Topographic colors
+  topoColorLow: string; 
+  topoColorHigh: string;
+  // Shape rotation controls
+  shapeRotationX: number;
+  shapeRotationY: number;
+  shapeRotationZ: number;
+  // Shape-specific parameters
+  torusOuterRadius: number;
+  torusInnerRadius: number;
+  coneRadius: number;
+  coneHeight: number;
+  cubeWidth: number;
+  cubeHeight: number;
+  cubeDepth: number;
+  sphereRadius: number;
+  sphereDetail: number;
+  triangleRadius: number;
+  triangleHeight: number;
+  shapeType: 'point' | 'cube' | 'sphere' | 'grid' | 'line' | 'triangle' | 'torus' | 'cone' | 'topographic';
 }
 
 // Additional declarations for any missing or custom types
