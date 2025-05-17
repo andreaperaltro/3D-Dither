@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, Instances, Instance } from '@react-three/drei';
 import * as THREE from 'three';
 
 interface DitherControls {
@@ -17,6 +17,7 @@ interface DitherControls {
   rotationSpeed: number;
   pointColor: string;
   colorSampling: boolean;
+  shapeType: 'point' | 'cube' | 'sphere';
 }
 
 interface DitherSceneProps {
@@ -24,22 +25,24 @@ interface DitherSceneProps {
   controls: DitherControls;
 }
 
-const DitherPoints: React.FC<{ 
+interface PointData {
+  position: THREE.Vector3;
+  color: THREE.Color;
+  size: number;
+}
+
+const DitherShapes: React.FC<{ 
   imageData?: ImageData;
   controls: DitherControls;
 }> = ({ imageData, controls }) => {
-  const pointsRef = useRef<THREE.Points>(null);
-  const [points, setPoints] = useState<THREE.Vector3[]>([]);
-  const [colors, setColors] = useState<THREE.Color[]>([]);
-  const [sizes, setSizes] = useState<number[]>([]);
+  const groupRef = useRef<THREE.Group>(null);
+  const [pointsData, setPointsData] = useState<PointData[]>([]);
 
   useEffect(() => {
     if (!imageData) return;
 
     const { width, height, data } = imageData;
-    const newPoints: THREE.Vector3[] = [];
-    const newColors: THREE.Color[] = [];
-    const newSizes: number[] = [];
+    const newPointsData: PointData[] = [];
 
     // Calculate the maximum dimension for proper scaling
     const maxDimension = Math.max(width, height);
@@ -69,86 +72,121 @@ const DitherPoints: React.FC<{
           const pointSize = controls.minDotSize + 
             (controls.maxDotSize - controls.minDotSize) * normalizedBrightness;
 
-          newPoints.push(
-            new THREE.Vector3(
-              (x - width / 2) * scale,
-              -(y - height / 2) * scale,
-              depth * controls.depthIntensity
-            )
+          const position = new THREE.Vector3(
+            (x - width / 2) * scale,
+            -(y - height / 2) * scale,
+            depth * controls.depthIntensity
           );
           
+          let color;
           if (controls.colorSampling) {
             // Apply brightness and contrast to colors
-            const color = new THREE.Color(
+            color = new THREE.Color(
               Math.max(0, Math.min(1, (r / 255 - 0.5) * controls.contrast + 0.5)) * controls.brightness,
               Math.max(0, Math.min(1, (g / 255 - 0.5) * controls.contrast + 0.5)) * controls.brightness,
               Math.max(0, Math.min(1, (b / 255 - 0.5) * controls.contrast + 0.5)) * controls.brightness
             );
             color.multiplyScalar(1.3); // Make colors more vibrant
-            newColors.push(color);
           } else {
-            newColors.push(new THREE.Color(controls.pointColor));
+            color = new THREE.Color(controls.pointColor);
           }
 
-          newSizes.push(pointSize);
+          newPointsData.push({
+            position,
+            color,
+            size: pointSize
+          });
         }
       }
     }
 
-    setPoints(newPoints);
-    setColors(newColors);
-    setSizes(newSizes);
+    setPointsData(newPointsData);
   }, [imageData, controls]);
 
   useFrame(() => {
-    if (pointsRef.current) {
-      pointsRef.current.rotation.y += controls.rotationSpeed;
+    if (groupRef.current) {
+      groupRef.current.rotation.y += controls.rotationSpeed;
     }
   });
 
-  const geometry = useMemo(() => {
-    const geo = new THREE.BufferGeometry();
-    if (points.length > 0) {
-      const positions = new Float32Array(points.length * 3);
-      const colorArray = new Float32Array(points.length * 3);
-      const sizeArray = new Float32Array(points.length);
-      
-      points.forEach((point, i) => {
-        positions[i * 3] = point.x;
-        positions[i * 3 + 1] = point.y;
-        positions[i * 3 + 2] = point.z;
-        
-        const color = colors[i];
-        colorArray[i * 3] = color.r;
-        colorArray[i * 3 + 1] = color.g;
-        colorArray[i * 3 + 2] = color.b;
-
-        sizeArray[i] = sizes[i];
-      });
-      
-      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      geo.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
-      geo.setAttribute('size', new THREE.BufferAttribute(sizeArray, 1));
-    }
-    return geo;
-  }, [points, colors, sizes]);
-
-  if (!imageData || points.length === 0) {
+  if (!imageData || pointsData.length === 0) {
     return null;
   }
 
-  return (
-    <points ref={pointsRef}>
-      <primitive object={geometry} />
-      <pointsMaterial
-        size={1}
-        vertexColors={controls.colorSampling}
-        sizeAttenuation={true}
-        transparent
-        opacity={controls.pointOpacity}
-      />
-    </points>
-  );
+  // Render different shape types
+  if (controls.shapeType === 'point') {
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(pointsData.length * 3);
+    const colors = new Float32Array(pointsData.length * 3);
+    const sizes = new Float32Array(pointsData.length);
+    
+    pointsData.forEach((point, i) => {
+      positions[i * 3] = point.position.x;
+      positions[i * 3 + 1] = point.position.y;
+      positions[i * 3 + 2] = point.position.z;
+      
+      colors[i * 3] = point.color.r;
+      colors[i * 3 + 1] = point.color.g;
+      colors[i * 3 + 2] = point.color.b;
+      
+      sizes[i] = point.size;
+    });
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    
+    return (
+      <group ref={groupRef}>
+        <points>
+          <primitive object={geometry} />
+          <pointsMaterial
+            size={1}
+            vertexColors={true}
+            sizeAttenuation={true}
+            transparent
+            opacity={controls.pointOpacity}
+          />
+        </points>
+      </group>
+    );
+  } else if (controls.shapeType === 'cube') {
+    return (
+      <group ref={groupRef}>
+        <Instances limit={pointsData.length}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial transparent opacity={controls.pointOpacity} />
+          {pointsData.map((point, i) => (
+            <Instance 
+              key={i} 
+              position={point.position} 
+              color={point.color} 
+              scale={point.size} 
+            />
+          ))}
+        </Instances>
+      </group>
+    );
+  } else if (controls.shapeType === 'sphere') {
+    return (
+      <group ref={groupRef}>
+        <Instances limit={pointsData.length}>
+          <sphereGeometry args={[0.5, 8, 8]} />
+          <meshStandardMaterial transparent opacity={controls.pointOpacity} />
+          {pointsData.map((point, i) => (
+            <Instance 
+              key={i} 
+              position={point.position} 
+              color={point.color} 
+              scale={point.size} 
+            />
+          ))}
+        </Instances>
+      </group>
+    );
+  }
+  
+  return null;
 };
 
 const DitherScene: React.FC<DitherSceneProps> = ({ imageData, controls }) => {
@@ -160,7 +198,7 @@ const DitherScene: React.FC<DitherSceneProps> = ({ imageData, controls }) => {
       >
         <ambientLight intensity={0.8} />
         <pointLight position={[10, 10, 10]} intensity={1.5} />
-        <DitherPoints imageData={imageData} controls={controls} />
+        <DitherShapes imageData={imageData} controls={controls} />
         <OrbitControls 
           enableZoom={true} 
           enablePan={true} 

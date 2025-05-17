@@ -14,6 +14,7 @@ interface DitherControls {
   rotationSpeed: number;
   pointColor: string;
   colorSampling: boolean;
+  shapeType: 'point' | 'cube' | 'sphere';
 }
 
 interface DitherControlsProps {
@@ -82,6 +83,18 @@ const DitherControls: React.FC<DitherControlsProps> = ({ controls, onChange }) =
             className="w-full"
           />
           <span className="text-xs text-gray-400">{controls.pointOpacity.toFixed(1)}</span>
+        </div>
+        <div className="space-y-2">
+          <label className="block text-sm">Shape Type</label>
+          <select 
+            value={controls.shapeType}
+            onChange={(e) => handleChange("shapeType", e.target.value)}
+            className="w-full p-2 bg-gray-700 text-white rounded"
+          >
+            <option value="point">Points</option>
+            <option value="cube">Cubes</option>
+            <option value="sphere">Spheres</option>
+          </select>
         </div>
       </div>
 

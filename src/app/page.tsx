@@ -22,6 +22,7 @@ export default function Home() {
     rotationSpeed: 0.005,
     pointColor: "#ffffff",
     colorSampling: true,
+    shapeType: 'point' as 'point' | 'cube' | 'sphere',
   });
 
   return (
